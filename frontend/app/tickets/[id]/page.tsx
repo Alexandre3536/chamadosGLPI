@@ -1,4 +1,5 @@
 'use client'
+import imageCompression from 'browser-image-compression';
 import { useEffect, useState, use, useRef } from 'react'
 import axios from 'axios'
 import { ArrowLeft, Send, CheckCircle, Plus, X, Star, RotateCcw, FileText, Download } from 'lucide-react'
@@ -68,12 +69,39 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onloadend = () => { setImageAnexo(reader.result as string) }
-    reader.readAsDataURL(file)
+
+    // Se for PDF, não comprimimos (a biblioteca é só para imagens)
+    if (file.type === 'application/pdf') {
+      const reader = new FileReader()
+      reader.onloadend = () => { setImageAnexo(reader.result as string) }
+      reader.readAsDataURL(file)
+      return
+    }
+
+    // Se for IMAGEM, a gente passa a prensa nela!
+    try {
+      const options = {
+        maxSizeMB: 0.2,           // No máximo 200KB (em vez de 5MB!)
+        maxWidthOrHeight: 1280,  // Redimensiona se for uma foto gigante
+        useWebWorker: true
+      }
+
+      // 1. Comprime a imagem
+      const compressedFile = await imageCompression(file, options);
+      
+      // 2. Transforma em texto para o State
+      const reader = new FileReader()
+      reader.onloadend = () => { 
+        setImageAnexo(reader.result as string) 
+      }
+      reader.readAsDataURL(compressedFile)
+
+    } catch (error) {
+      console.error("Erro ao comprimir imagem:", error)
+    }
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
