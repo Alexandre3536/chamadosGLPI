@@ -1,0 +1,45 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "sqlite"
+  // O caminho "./dev.db" dentro da pasta prisma resolve o arquivo corretamente
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  nome      String
+  senha     String
+  role      String    @default("USER") // ADMIN ou USER
+  tickets   Ticket[]
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Ticket {
+  id          Int       @id @default(autoincrement())
+  titulo      String
+  descricao   String
+  status      String    @default("ABERTO") // ABERTO, EM_ANDAMENTO, FECHADO
+  prioridade  String    @default("BAIXA")
+  cliente     User      @relation(fields: [clienteId], references: [id])
+  clienteId   Int
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  texto     String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  ticketId  Int
+  autor     User     @relation(fields: [autorId], references: [id])
+  autorId   Int
+  createdAt DateTime @default(now())
+}
