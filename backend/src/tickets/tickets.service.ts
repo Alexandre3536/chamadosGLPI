@@ -28,11 +28,14 @@ export class TicketsService {
     });
   }
 
-  // ESSA É A FUNÇÃO QUE O SEU ERRO ESTÁ PEDINDO!
+  // FUNÇÃO CORRIGIDA: Vamos filtrar o que entra no banco
   async update(id: number, updateData: any) {
+    // Destruturamos o objeto para REMOVER a avaliacao, se ela vier no pacote
+    const { avaliacao, ...dadosFiltrados } = updateData;
+
     return this.prisma.ticket.update({
       where: { id },
-      data: updateData,
+      data: dadosFiltrados, // Enviamos apenas o que o banco conhece (titulo, descricao, status, etc)
     });
   }
 
