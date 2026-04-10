@@ -4,6 +4,9 @@ import axios from 'axios'
 import { useRouter } from 'next/navigation'
 import { Lock, Mail, Ticket } from 'lucide-react'
 
+// 1. DEFINIMOS A URL BASE (Igual fizemos no AdminUsuarios)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -12,15 +15,15 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      // Chamada para o seu backend NestJS
-      const res = await axios.post('http://localhost:3000/users/login', { email, senha })
+      // 2. TROCAMOS O LINK FIXO PELA VARIÁVEL DINÂMICA
+      const res = await axios.post(`${API_URL}/users/login`, { email, senha })
       
-      // PERSISTÊNCIA DOS DADOS (O que faltava para o chat funcionar)
+      // PERSISTÊNCIA DOS DADOS
       localStorage.setItem('user_name', res.data.nome)
-      localStorage.setItem('user_id', String(res.data.id)) // Salva o ID (ex: "2")
-      localStorage.setItem('user_role', res.data.role)   // Salva se é ADMIN ou USER
+      localStorage.setItem('user_id', String(res.data.id))
+      localStorage.setItem('user_role', res.data.role)
 
-      router.push('/') // Vai para a Home
+      router.push('/') 
     } catch (err) {
       console.error(err)
       alert("E-mail ou senha incorretos!")

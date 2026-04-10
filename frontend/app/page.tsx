@@ -5,6 +5,9 @@ import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, MessageSq
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
+// 1. DEFINIMOS A URL BASE DINÂMICA
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export default function Home() {
   const [tickets, setTickets] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -21,13 +24,15 @@ export default function Home() {
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : 'USER'
 
   const fetchTickets = () => {
-    axios.get('http://localhost:3000/tickets')
+    // 2. BUSCA DE TICKETS COM API_URL
+    axios.get(`${API_URL}/tickets`)
       .then(res => setTickets(res.data))
       .catch(err => console.error(err))
   }
 
   const fetchUserData = (id: string) => {
-    axios.get(`http://localhost:3000/users/${id}`)
+    // 3. BUSCA DE DADOS DO USUÁRIO COM API_URL
+    axios.get(`${API_URL}/users/${id}`)
       .then(res => {
         if (res.data.avatar) setAvatarUrl(res.data.avatar)
       })
@@ -56,7 +61,10 @@ export default function Home() {
     reader.onloadend = async () => {
       const base64 = reader.result as string
       setAvatarUrl(base64)
-      try { await axios.patch(`http://localhost:3000/users/${userId}`, { avatar: base64 }) } catch (err) { console.error(err) }
+      try { 
+        // 4. ATUALIZAÇÃO DE AVATAR COM API_URL
+        await axios.patch(`${API_URL}/users/${userId}`, { avatar: base64 }) 
+      } catch (err) { console.error(err) }
     }
     reader.readAsDataURL(file)
   }
@@ -64,7 +72,8 @@ export default function Home() {
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await axios.post('http://localhost:3000/tickets', { titulo, descricao, prioridade, clienteId: Number(userId) })
+      // 5. CRIAÇÃO DE TICKET COM API_URL
+      await axios.post(`${API_URL}/post/tickets`, { titulo, descricao, prioridade, clienteId: Number(userId) })
       setTitulo(''); setDescricao(''); setIsModalOpen(false); fetchTickets() 
     } catch (err) { alert("Erro ao criar") }
   }

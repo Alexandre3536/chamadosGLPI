@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { UserPlus, ArrowLeft, Shield, User, Trash2, Mail, Fingerprint, Edit3, X } from 'lucide-react'
 import Link from 'next/link'
 
+// 1. DEFINIMOS A URL BASE FORA DO COMPONENTE
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export default function AdminUsuarios() {
   const [users, setUsers] = useState([])
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -20,7 +23,7 @@ export default function AdminUsuarios() {
 
   const fetchUsers = async () => {
     try {
-      const res = await axios.get('http://localhost:3000/users')
+      const res = await axios.get(`${API_URL}/users`)
       setUsers(res.data)
     } catch (err) { console.error("Erro ao carregar usuários", err) }
   }
@@ -47,12 +50,11 @@ export default function AdminUsuarios() {
     try {
       if (editingId) {
         // Lógica de EDIÇÃO (PATCH)
-        // Se a senha estiver vazia na edição, o backend geralmente mantém a atual
-        await axios.patch(`http://localhost:3000/users/${editingId}`, { nome, email, role, ...(senha && { senha }) })
+        await axios.patch(`${API_URL}/users/${editingId}`, { nome, email, role, ...(senha && { senha }) })
         alert("Usuário atualizado!")
       } else {
         // Lógica de CRIAÇÃO (POST)
-        await axios.post('http://localhost:3000/users', { nome, email, senha, role })
+        await axios.post(`${API_URL}/users`, { nome, email, senha, role })
         alert("Usuário criado!")
       }
       resetForm()
@@ -73,7 +75,7 @@ export default function AdminUsuarios() {
     if (id === Number(userIdLogado)) return alert("Você não pode se auto-excluir!")
     if (!confirm("Deseja realmente remover este acesso?")) return
     try {
-      await axios.delete(`http://localhost:3000/users/${id}`)
+      await axios.delete(`${API_URL}/users/${id}`)
       fetchUsers()
     } catch (err) { alert("Erro ao excluir usuário.") }
   }

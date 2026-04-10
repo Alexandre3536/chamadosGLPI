@@ -4,6 +4,9 @@ import axios from 'axios'
 import { ArrowLeft, Send, CheckCircle, Plus, X, Star, RotateCcw, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 
+// 1. DEFINIMOS A URL BASE DINÂMICA
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 export default function TicketDetails({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [ticket, setTicket] = useState<any>(null)
@@ -32,11 +35,13 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
   const loadData = async (forceScroll = false) => {
     try {
-      const ticketRes = await axios.get(`http://localhost:3000/tickets`) 
+      // 2. USANDO A VARIÁVEL PARA BUSCAR TICKETS
+      const ticketRes = await axios.get(`${API_URL}/tickets`) 
       const currentTicket = ticketRes.data.find((t: any) => Number(t.id) === Number(id))
       setTicket(currentTicket)
 
-      const msgRes = await axios.get(`http://localhost:3000/messages/ticket/${id}`)
+      // 3. USANDO A VARIÁVEL PARA BUSCAR MENSAGENS
+      const msgRes = await axios.get(`${API_URL}/messages/ticket/${id}`)
       
       setMessages(prev => {
         const hasNew = msgRes.data.length > prev.length
@@ -75,7 +80,8 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     if (e) e.preventDefault()
     if (!newMessage.trim() && !imageAnexo) return
     try {
-      await axios.post('http://localhost:3000/messages', {
+      // 4. USANDO A VARIÁVEL PARA ENVIAR MENSAGENS
+      await axios.post(`${API_URL}/messages`, {
         texto: newMessage, imagem: imageAnexo, ticketId: Number(id), autorId: Number(userId) 
       })
       setNewMessage(''); setImageAnexo(null)
@@ -84,14 +90,13 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     } catch (err) { alert("Erro ao enviar") }
   }
 
-  // FUNÇÃO DE AVALIAÇÃO CORRIGIDA
   const handleAvaliar = async (estrelas: number) => {
     try {
-      await axios.patch(`http://localhost:3000/tickets/${id}`, { 
+      // 5. USANDO A VARIÁVEL PARA AVALIAR
+      await axios.patch(`${API_URL}/tickets/${id}`, { 
         avaliacao: Number(estrelas), 
         status: 'FECHADO' 
       })
-      // Atualiza localmente para o usuário ver o brilho das estrelas na hora
       setTicket((prev: any) => ({ ...prev, avaliacao: estrelas }))
       await loadData(false)
     } catch (err) { alert("Erro ao salvar avaliação") }
@@ -100,7 +105,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
   const handleReabrir = async () => {
     if(!confirm("Deseja reabrir este chamado?")) return
     try {
-      await axios.patch(`http://localhost:3000/tickets/${id}`, { status: 'REABERTO', avaliacao: null })
+      await axios.patch(`${API_URL}/tickets/${id}`, { status: 'REABERTO', avaliacao: null })
       loadData()
     } catch (err) { alert("Erro ao reabrir") }
   }
@@ -108,7 +113,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
   const handleCloseTicket = async () => {
     if (!confirm("Encerrar chamado?")) return
     try {
-      await axios.patch(`http://localhost:3000/tickets/${id}`, { status: 'FECHADO' })
+      await axios.patch(`${API_URL}/tickets/${id}`, { status: 'FECHADO' })
       loadData()
     } catch (err) { alert("Erro ao fechar") }
   }
