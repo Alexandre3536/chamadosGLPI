@@ -6,7 +6,7 @@ import { ArrowLeft, Send, CheckCircle, Plus, X, Star, RotateCcw, FileText, Downl
 import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
 
-// 1. CONFIGURAÇÃO DO SUPABASE E API
+// CONFIGURAÇÃO DO SUPABASE E API
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const supabase = createClient(
   'https://iamfyqsgrrlxdgghtbas.supabase.co', 
@@ -19,7 +19,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   
-  // Estados para o novo sistema de upload (Storage)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   
@@ -50,24 +49,48 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       setTicket(currentTicket)
 
       const msgRes = await axios.get(`${API_URL}/messages/ticket/${id}`)
+      setMessages(msgRes.data)
       
-      setMessages(prev => {
-        const hasNew = msgRes.data.length > prev.length
-        if (forceScroll) {
-          setTimeout(() => scrollToBottom('auto'), 100)
-        } else if (hasNew && isAutoScrollEnabled) {
-          setTimeout(() => scrollToBottom('smooth'), 100)
-        }
-        return msgRes.data
-      })
+      if (forceScroll) {
+        setTimeout(() => scrollToBottom('auto'), 100)
+      }
     } catch (err) { console.error("Erro ao carregar dados", err) }
   }
 
+  // --- O MÁGICO DO REALTIME ESTÁ AQUI ---
   useEffect(() => {
-    loadData(true)
-    const interval = setInterval(() => { loadData(false) }, 3000)
-    return () => clearInterval(interval)
-  }, [id])
+    loadData(true);
+
+    // Cria o canal para ouvir mudanças na tabela Message em tempo real
+    const channel = supabase
+      .channel(`ticket-realtime-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'Message', // Verifique se no Supabase o nome é Message ou messages
+          filter: `ticketId=eq.${id}`
+        },
+        (payload) => {
+          // Quando chega uma nova linha no banco, injetamos ela direto no estado
+          setMessages((prev) => {
+            if (prev.find(m => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+          
+          if (isAutoScrollEnabled) {
+            setTimeout(() => scrollToBottom('smooth'), 100);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]); 
+  // ---------------------------------------
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -88,13 +111,13 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
     try {
       const options = {
-        maxSizeMB: 0.2,           // Prensa de 200KB
+        maxSizeMB: 0.2,           
         maxWidthOrHeight: 1280,
         useWebWorker: true
       }
       const compressedFile = await imageCompression(file, options);
       setFileToUpload(compressedFile)
-      setPreviewUrl(URL.createObjectURL(compressedFile)) // Gera preview local rápido
+      setPreviewUrl(URL.createObjectURL(compressedFile)) 
     } catch (error) {
       console.error("Erro ao comprimir imagem:", error)
     }
@@ -107,7 +130,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     try {
       let finalUrl = null;
 
-      // 1. Se houver arquivo, sobe para o Storage
       if (fileToUpload) {
         const fileExt = fileToUpload.name.split('.').pop();
         const fileName = `${id}-${Date.now()}.${fileExt}`;
@@ -118,7 +140,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
         if (error) throw error;
 
-        // 2. Pega a URL pública
         const { data: publicData } = supabase.storage
           .from('anexos')
           .getPublicUrl(fileName);
@@ -126,7 +147,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
         finalUrl = publicData.publicUrl;
       }
 
-      // 3. Envia para o banco via API (Mandando a URL em vez do Base64)
+      // Envia via API. O Realtime vai detectar esse INSERT e mostrar na tela sozinho.
       await axios.post(`${API_URL}/messages`, {
         texto: newMessage, 
         imagem: finalUrl, 
@@ -137,8 +158,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       setNewMessage(''); 
       setFileToUpload(null);
       setPreviewUrl(null);
-      await loadData(false) 
-      scrollToBottom('smooth') 
+      // Não precisamos mais do loadData() aqui, o Realtime cuida disso!
     } catch (err) { 
       console.error(err)
       alert("Erro ao enviar mensagem") 
@@ -149,7 +169,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     try {
       await axios.patch(`${API_URL}/tickets/${id}`, { avaliacao: Number(estrelas), status: 'FECHADO' })
       setTicket((prev: any) => ({ ...prev, avaliacao: estrelas }))
-      await loadData(false)
     } catch (err) { alert("Erro ao salvar avaliação") }
   }
 
