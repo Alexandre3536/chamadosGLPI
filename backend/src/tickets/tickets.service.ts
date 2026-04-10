@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -11,21 +11,43 @@ export class TicketsService {
         titulo: data.titulo,
         descricao: data.descricao,
         prioridade: data.prioridade,
-        // Garante que o ID do cliente seja um número inteiro
         cliente: { connect: { id: Number(data.clienteId) } }
       },
     });
   }
 
-async findAll() {
-  return this.prisma.ticket.findMany({
-    include: { 
-      cliente: true,
-      messages: true // ADICIONE ISSO AQUI!
-    },
-    orderBy: {
-      updatedAt: 'desc' // Opcional: faz os tickets com mensagens novas subirem na lista
-    }
-  });
-}
+  async findAll() {
+    return this.prisma.ticket.findMany({
+      include: { 
+        cliente: true,
+        messages: true 
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    });
+  }
+
+  // ESSA É A FUNÇÃO QUE O SEU ERRO ESTÁ PEDINDO!
+  async update(id: number, updateData: any) {
+    return this.prisma.ticket.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
+  async findOne(id: number) {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: { cliente: true, messages: true }
+    });
+    if (!ticket) throw new NotFoundException(`Ticket #${id} não encontrado`);
+    return ticket;
+  }
+
+  async remove(id: number) {
+    return this.prisma.ticket.delete({
+      where: { id },
+    });
+  }
 }
