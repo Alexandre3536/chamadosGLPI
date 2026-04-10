@@ -1,9 +1,9 @@
 // prisma/schema.prisma
 
 datasource db {
-  provider = "sqlite"
-  // O caminho "./dev.db" dentro da pasta prisma resolve o arquivo corretamente
-  url      = "file:./dev.db"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 generator client {
