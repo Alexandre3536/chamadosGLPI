@@ -7,7 +7,8 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  signIn(@Body() signInDto: Record<string, any>) {
-    return this.authService.login(signInDto.email, signInDto.password);
+  async signIn(@Body() signInDto: Record<string, any>) {
+    // Chama a função login() do service usando o e-mail e a senha do Body
+    return this.authService.login(signInDto.email, signInDto.senha);
   }
 }

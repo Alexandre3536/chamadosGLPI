@@ -16,20 +16,19 @@ export class AuthService {
       where: { email },
     });
 
-    // 2. Verifica se o usuário existe e se ele tem uma senha gravada
-    // Isso evita o erro "data and hash arguments required"
+    // 2. Verifica se o usuário existe
     if (!user || !user.senha) {
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
-    // 3. Compara a senha enviada (pass) com o hash do banco (user.senha)
+    // 3. Compara a senha enviada com o hash do banco
     const senhaValida = await bcrypt.compare(pass, user.senha);
 
     if (!senhaValida) {
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
 
-    // 4. Se chegou aqui, as credenciais estão certas. Gera o Token.
+    // 4. Gera o Token (Payload)
     const payload = { 
       sub: user.id, 
       email: user.email, 

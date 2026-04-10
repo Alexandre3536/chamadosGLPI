@@ -1,34 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  UseGuards,
-  Req 
-} from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common'; // Adicionamos Patch e Param aqui
 import { TicketsService } from './tickets.service';
-import { CreateTicketDto } from './dto/create-ticket.dto';
-import { UpdateTicketDto } from './dto/update-ticket.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard)
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
-@Post()
-  create(@Body() createTicketDto: CreateTicketDto, @Req() req: any) {
-    // Vamos garantir que pegamos o ID, não importa se o nome é 'sub' ou 'userId'
-    const userId = req.user.sub || req.user.userId; 
-    
-    if (!userId) {
-      console.log("ERRO: Não encontrei o ID do usuário no token!");
-    }
-
-    return this.ticketsService.create(createTicketDto, userId);
+  @Post()
+  create(@Body() data: any) {
+    return this.ticketsService.create(data);
   }
 
   @Get()
@@ -36,18 +15,10 @@ export class TicketsController {
     return this.ticketsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.ticketsService.findOne(+id);
-  }
-
+  // Rota para atualizar o status (ex: fechar o chamado)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTicketDto: UpdateTicketDto) {
-    return this.ticketsService.update(+id, updateTicketDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.ticketsService.remove(+id);
-  }
+  update(@Param('id') id: string, @Body() updateData: any) {
+    // O sinal de + antes do id serve para converter a string em número
+    return this.ticketsService.update(+id, updateData);
+  } 
 }
