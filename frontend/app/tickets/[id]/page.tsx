@@ -4,16 +4,25 @@ import { useEffect, useState, use, useRef } from 'react'
 import axios from 'axios'
 import { ArrowLeft, Send, CheckCircle, Plus, X, Star, RotateCcw, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
+import { createClient } from '@supabase/supabase-js'
 
-// 1. DEFINIMOS A URL BASE DINÂMICA
+// 1. CONFIGURAÇÃO DO SUPABASE E API
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const supabase = createClient(
+  'https://iamfyqsgrrlxdgghtbas.supabase.co', 
+  'sb_publishable__DmqMZJRAkr5LcbnMBSeDw_eAfNrHF_'
+);
 
 export default function TicketDetails({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [ticket, setTicket] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
-  const [imageAnexo, setImageAnexo] = useState<string | null>(null)
+  
+  // Estados para o novo sistema de upload (Storage)
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  
   const [hoverEstrelas, setHoverEstrelas] = useState(0)
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true)
   
@@ -36,12 +45,10 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
   const loadData = async (forceScroll = false) => {
     try {
-      // 2. USANDO A VARIÁVEL PARA BUSCAR TICKETS
       const ticketRes = await axios.get(`${API_URL}/tickets`) 
       const currentTicket = ticketRes.data.find((t: any) => Number(t.id) === Number(id))
       setTicket(currentTicket)
 
-      // 3. USANDO A VARIÁVEL PARA BUSCAR MENSAGENS
       const msgRes = await axios.get(`${API_URL}/messages/ticket/${id}`)
       
       setMessages(prev => {
@@ -73,32 +80,21 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Se for PDF, não comprimimos (a biblioteca é só para imagens)
     if (file.type === 'application/pdf') {
-      const reader = new FileReader()
-      reader.onloadend = () => { setImageAnexo(reader.result as string) }
-      reader.readAsDataURL(file)
+      setFileToUpload(file)
+      setPreviewUrl('pdf-icon')
       return
     }
 
-    // Se for IMAGEM, a gente passa a prensa nela!
     try {
       const options = {
-        maxSizeMB: 0.2,           // No máximo 200KB (em vez de 5MB!)
-        maxWidthOrHeight: 1280,  // Redimensiona se for uma foto gigante
+        maxSizeMB: 0.2,           // Prensa de 200KB
+        maxWidthOrHeight: 1280,
         useWebWorker: true
       }
-
-      // 1. Comprime a imagem
       const compressedFile = await imageCompression(file, options);
-      
-      // 2. Transforma em texto para o State
-      const reader = new FileReader()
-      reader.onloadend = () => { 
-        setImageAnexo(reader.result as string) 
-      }
-      reader.readAsDataURL(compressedFile)
-
+      setFileToUpload(compressedFile)
+      setPreviewUrl(URL.createObjectURL(compressedFile)) // Gera preview local rápido
     } catch (error) {
       console.error("Erro ao comprimir imagem:", error)
     }
@@ -106,25 +102,52 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
   const handleSendMessage = async (e: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!newMessage.trim() && !imageAnexo) return
+    if (!newMessage.trim() && !fileToUpload) return
+    
     try {
-      // 4. USANDO A VARIÁVEL PARA ENVIAR MENSAGENS
+      let finalUrl = null;
+
+      // 1. Se houver arquivo, sobe para o Storage
+      if (fileToUpload) {
+        const fileExt = fileToUpload.name.split('.').pop();
+        const fileName = `${id}-${Date.now()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('anexos')
+          .upload(fileName, fileToUpload);
+
+        if (error) throw error;
+
+        // 2. Pega a URL pública
+        const { data: publicData } = supabase.storage
+          .from('anexos')
+          .getPublicUrl(fileName);
+        
+        finalUrl = publicData.publicUrl;
+      }
+
+      // 3. Envia para o banco via API (Mandando a URL em vez do Base64)
       await axios.post(`${API_URL}/messages`, {
-        texto: newMessage, imagem: imageAnexo, ticketId: Number(id), autorId: Number(userId) 
+        texto: newMessage, 
+        imagem: finalUrl, 
+        ticketId: Number(id), 
+        autorId: Number(userId) 
       })
-      setNewMessage(''); setImageAnexo(null)
+
+      setNewMessage(''); 
+      setFileToUpload(null);
+      setPreviewUrl(null);
       await loadData(false) 
       scrollToBottom('smooth') 
-    } catch (err) { alert("Erro ao enviar") }
+    } catch (err) { 
+      console.error(err)
+      alert("Erro ao enviar mensagem") 
+    }
   }
 
   const handleAvaliar = async (estrelas: number) => {
     try {
-      // 5. USANDO A VARIÁVEL PARA AVALIAR
-      await axios.patch(`${API_URL}/tickets/${id}`, { 
-        avaliacao: Number(estrelas), 
-        status: 'FECHADO' 
-      })
+      await axios.patch(`${API_URL}/tickets/${id}`, { avaliacao: Number(estrelas), status: 'FECHADO' })
       setTicket((prev: any) => ({ ...prev, avaliacao: estrelas }))
       await loadData(false)
     } catch (err) { alert("Erro ao salvar avaliação") }
@@ -172,7 +195,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
         {messages.map((msg) => {
           const isMe = Number(msg.autorId) === Number(userId);
-          const isPDF = msg.imagem?.includes("application/pdf") || msg.imagem?.includes("data:application/pdf");
+          const isPDF = msg.imagem?.toLowerCase().endsWith(".pdf") || msg.imagem?.includes("application/pdf");
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] p-4 rounded-2xl shadow-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
@@ -182,7 +205,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
                     {isPDF ? (
                       <div className="bg-slate-900 p-4 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2 text-red-400"><FileText size={20} /><span className="text-[10px] font-bold uppercase">PDF</span></div>
-                        <a href={msg.imagem} download={`anexo_${msg.id}.pdf`} className="p-2 bg-slate-700 hover:bg-blue-500 rounded-lg transition-colors"><Download size={16} /></a>
+                        <a href={msg.imagem} target="_blank" rel="noreferrer" className="p-2 bg-slate-700 hover:bg-blue-500 rounded-lg transition-colors"><Download size={16} /></a>
                       </div>
                     ) : (
                       <img src={msg.imagem} alt="Anexo" className="w-full h-auto cursor-pointer" onClick={() => window.open(msg.imagem)} />
@@ -203,16 +226,16 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       <div className="p-6 bg-slate-900 border-t border-slate-800">
         {ticket.status !== 'FECHADO' ? (
           <div className="max-w-4xl mx-auto">
-            {imageAnexo && (
+            {previewUrl && (
               <div className="relative inline-block mb-4 p-2 bg-slate-800 rounded-xl border border-blue-500">
-                {imageAnexo.includes("pdf") ? <FileText className="text-red-500" size={40} /> : <img src={imageAnexo} className="h-20 w-20 object-cover rounded-lg" />}
-                <button onClick={() => setImageAnexo(null)} className="absolute -top-2 -right-2 bg-red-600 p-1 rounded-full text-white"><X size={12} /></button>
+                {previewUrl === 'pdf-icon' ? <FileText className="text-red-500" size={40} /> : <img src={previewUrl} className="h-20 w-20 object-cover rounded-lg" />}
+                <button onClick={() => {setPreviewUrl(null); setFileToUpload(null)}} className="absolute -top-2 -right-2 bg-red-600 p-1 rounded-full text-white"><X size={12} /></button>
               </div>
             )}
             <form onSubmit={handleSendMessage} className="flex gap-3 items-end">
               <label className="p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl cursor-pointer text-slate-400 border border-slate-700 transition-colors"><Plus size={24} /><input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} /></label>
               <textarea rows={1} className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500 text-white" placeholder="Digite sua resposta..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={handleKeyDown} />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 p-4 rounded-2xl text-white transition-all shadow-lg active:scale-95 disabled:opacity-50" disabled={!newMessage.trim() && !imageAnexo}><Send size={24} /></button>
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 p-4 rounded-2xl text-white transition-all shadow-lg active:scale-95 disabled:opacity-50" disabled={!newMessage.trim() && !fileToUpload}><Send size={24} /></button>
             </form>
           </div>
         ) : (
