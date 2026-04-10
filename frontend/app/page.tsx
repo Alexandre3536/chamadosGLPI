@@ -5,7 +5,7 @@ import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, MessageSq
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-// 1. DEFINIMOS A URL BASE DINÂMICA
+// 1. URL BASE DINÂMICA
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export default function Home() {
@@ -24,14 +24,12 @@ export default function Home() {
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : 'USER'
 
   const fetchTickets = () => {
-    // 2. BUSCA DE TICKETS COM API_URL
     axios.get(`${API_URL}/tickets`)
       .then(res => setTickets(res.data))
       .catch(err => console.error(err))
   }
 
   const fetchUserData = (id: string) => {
-    // 3. BUSCA DE DADOS DO USUÁRIO COM API_URL
     axios.get(`${API_URL}/users/${id}`)
       .then(res => {
         if (res.data.avatar) setAvatarUrl(res.data.avatar)
@@ -62,7 +60,6 @@ export default function Home() {
       const base64 = reader.result as string
       setAvatarUrl(base64)
       try { 
-        // 4. ATUALIZAÇÃO DE AVATAR COM API_URL
         await axios.patch(`${API_URL}/users/${userId}`, { avatar: base64 }) 
       } catch (err) { console.error(err) }
     }
@@ -72,10 +69,21 @@ export default function Home() {
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      // 5. CRIAÇÃO DE TICKET COM API_URL
-      await axios.post(`${API_URL}/post/tickets`, { titulo, descricao, prioridade, clienteId: Number(userId) })
-      setTitulo(''); setDescricao(''); setIsModalOpen(false); fetchTickets() 
-    } catch (err) { alert("Erro ao criar") }
+      // FIX: Removido o "/post" que estava causando o erro
+      await axios.post(`${API_URL}/tickets`, { 
+        titulo, 
+        descricao, 
+        prioridade, 
+        clienteId: Number(userId) 
+      })
+      setTitulo(''); 
+      setDescricao(''); 
+      setIsModalOpen(false); 
+      fetchTickets() 
+    } catch (err) { 
+      console.error(err)
+      alert("Erro ao criar chamado. Verifique a conexão com o servidor.") 
+    }
   }
 
   const ticketsDoUsuario = tickets.filter((t: any) => userRole === 'ADMIN' || t.clienteId === Number(userId))
@@ -98,7 +106,6 @@ export default function Home() {
             <p className="text-slate-400 mt-1 uppercase text-[10px] tracking-[0.2em] font-bold">Salto Veloso, SC</p>
           </div>
           <div className="flex items-center gap-6">
-            
             {userRole === 'ADMIN' && (
               <Link href="/admin/usuarios">
                 <button className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-blue-400 border border-slate-800 px-5 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95">
@@ -163,7 +170,6 @@ export default function Home() {
             return (
               <Link href={`/tickets/${ticket.id}`} key={ticket.id} className="block group">
                 <div className={`${cardStyle} border-l-4 p-6 rounded-2xl hover:brightness-110 transition-all cursor-pointer relative overflow-hidden ${ticket.status === 'REABERTO' ? 'border-l-orange-500' : ticket.prioridade === 'ALTA' ? 'border-l-red-600' : 'border-l-blue-500'}`}>
-                  
                   {temNovidade && (
                     <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-blue-600 text-[8px] font-black px-3 py-1.5 rounded-full animate-bounce shadow-lg shadow-blue-500/40 z-10">
                       <MessageSquare size={10} fill="white"/> NOVA RESPOSTA
