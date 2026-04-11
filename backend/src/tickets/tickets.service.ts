@@ -21,7 +21,6 @@ export class TicketsService {
       where: userId ? { clienteId: userId } : {}, 
       include: { 
         cliente: true,
-        // O PULO DO GATO: Traz apenas a última mensagem para o selo azul funcionar na Home
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1, 
@@ -39,7 +38,7 @@ export class TicketsService {
       include: { 
         cliente: true, 
         messages: {
-          orderBy: { createdAt: 'asc' } // Aqui no detalhe traz todas em ordem cronológica
+          orderBy: { createdAt: 'asc' }
         }
       }
     });
@@ -48,17 +47,22 @@ export class TicketsService {
   }
 
   async update(id: number, updateData: any) {
-    // Destruturação para garantir que o ID não seja enviado no corpo do update do Prisma
-    const { id: _, ...data } = updateData;
+    /**
+     * AQUI ESTÁ A MUDANÇA:
+     * Extraímos 'id' e 'avaliacao' (que causava o erro) do updateData.
+     * O resto dos campos válidos ficam na constante 'data'.
+     */
+    const { id: _, avaliacao, cliente, messages, ...data } = updateData;
+
     return this.prisma.ticket.update({
-      where: { id },
-      data: data,
+      where: { id: Number(id) },
+      data: data, // O Prisma agora só recebe campos que ele conhece
     });
   }
 
   async remove(id: number) {
     return this.prisma.ticket.delete({
-      where: { id },
+      where: { id: Number(id) },
     });
   }
 }
