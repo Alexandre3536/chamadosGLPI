@@ -6,7 +6,6 @@ import { ArrowLeft, Send, CheckCircle, Plus, X, Star, RotateCcw, FileText, Downl
 import Link from 'next/link'
 import { createClient } from '@supabase/supabase-js'
 
-// CONFIGURAÇÃO DO SUPABASE E API
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const supabase = createClient(
   'https://iamfyqsgrrlxdgghtbas.supabase.co', 
@@ -57,11 +56,9 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     } catch (err) { console.error("Erro ao carregar dados", err) }
   }
 
-  // --- O MÁGICO DO REALTIME ESTÁ AQUI ---
   useEffect(() => {
     loadData(true);
 
-    // Cria o canal para ouvir mudanças na tabela Message em tempo real
     const channel = supabase
       .channel(`ticket-realtime-${id}`)
       .on(
@@ -69,11 +66,10 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'Message', // Verifique se no Supabase o nome é Message ou messages
+          table: 'Message', 
           filter: `ticketId=eq.${id}`
         },
         (payload) => {
-          // Quando chega uma nova linha no banco, injetamos ela direto no estado
           setMessages((prev) => {
             if (prev.find(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
@@ -90,7 +86,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       supabase.removeChannel(channel);
     };
   }, [id]); 
-  // ---------------------------------------
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -110,10 +105,12 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     }
 
     try {
+      // OTIMIZAÇÃO 1: Compressão agressiva e conversão para JPEG
       const options = {
         maxSizeMB: 0.2,           
         maxWidthOrHeight: 1280,
-        useWebWorker: true
+        useWebWorker: true,
+        fileType: 'image/jpeg' as const // Força JPEG para economizar banda
       }
       const compressedFile = await imageCompression(file, options);
       setFileToUpload(compressedFile)
@@ -131,12 +128,17 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       let finalUrl = null;
 
       if (fileToUpload) {
-        const fileExt = fileToUpload.name.split('.').pop();
+        // Garante a extensão correta se foi convertido para jpeg
+        const fileExt = fileToUpload.type === 'image/jpeg' ? 'jpg' : fileToUpload.name.split('.').pop();
         const fileName = `${id}-${Date.now()}.${fileExt}`;
         
+        // OTIMIZAÇÃO 2: Cache-Control para o navegador não baixar a mesma imagem várias vezes
         const { data, error } = await supabase.storage
           .from('anexos')
-          .upload(fileName, fileToUpload);
+          .upload(fileName, fileToUpload, {
+            cacheControl: '3600', // Cache de 1 hora
+            upsert: false
+          });
 
         if (error) throw error;
 
@@ -147,7 +149,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
         finalUrl = publicData.publicUrl;
       }
 
-      // Envia via API. O Realtime vai detectar esse INSERT e mostrar na tela sozinho.
       await axios.post(`${API_URL}/messages`, {
         texto: newMessage, 
         imagem: finalUrl, 
@@ -158,7 +159,6 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       setNewMessage(''); 
       setFileToUpload(null);
       setPreviewUrl(null);
-      // Não precisamos mais do loadData() aqui, o Realtime cuida disso!
     } catch (err) { 
       console.error(err)
       alert("Erro ao enviar mensagem") 
@@ -220,14 +220,21 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
               <div className={`max-w-[75%] p-4 rounded-2xl shadow-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
                 {msg.texto && <p className="text-sm font-medium leading-relaxed mb-2 whitespace-pre-wrap">{msg.texto}</p>}
                 {msg.imagem && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-black/10">
+                  <div className="mt-2 rounded-lg overflow-hidden border border-black/10 bg-slate-900">
                     {isPDF ? (
-                      <div className="bg-slate-900 p-4 flex items-center justify-between gap-4">
+                      <div className="p-4 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2 text-red-400"><FileText size={20} /><span className="text-[10px] font-bold uppercase">PDF</span></div>
                         <a href={msg.imagem} target="_blank" rel="noreferrer" className="p-2 bg-slate-700 hover:bg-blue-500 rounded-lg transition-colors"><Download size={16} /></a>
                       </div>
                     ) : (
-                      <img src={msg.imagem} alt="Anexo" className="w-full h-auto cursor-pointer" onClick={() => window.open(msg.imagem)} />
+                      /* OTIMIZAÇÃO 3: Lazy Loading e Altura Máxima */
+                      <img 
+                        src={msg.imagem} 
+                        alt="Anexo" 
+                        className="w-full max-h-96 object-contain cursor-pointer transition-opacity hover:opacity-90" 
+                        loading="lazy" 
+                        onClick={() => window.open(msg.imagem)} 
+                      />
                     )}
                   </div>
                 )}
