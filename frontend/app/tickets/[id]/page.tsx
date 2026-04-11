@@ -41,11 +41,12 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
     setIsAutoScrollEnabled(isAtBottom)
   }
 
+  // MUDANÇA CRÍTICA: Agora buscamos apenas UM ticket pelo ID
   const loadData = async (forceScroll = false) => {
     try {
-      const ticketRes = await axios.get(`${API_URL}/tickets`) 
-      const currentTicket = ticketRes.data.find((t: any) => Number(t.id) === Number(id))
-      setTicket(currentTicket)
+      // Pedimos ao backend apenas o ticket da página atual
+      const ticketRes = await axios.get(`${API_URL}/tickets/${id}`) 
+      setTicket(ticketRes.data)
 
       const msgRes = await axios.get(`${API_URL}/messages/ticket/${id}`)
       setMessages(msgRes.data)
@@ -53,7 +54,9 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       if (forceScroll) {
         setTimeout(() => scrollToBottom('auto'), 100)
       }
-    } catch (err) { console.error("Erro ao carregar dados", err) }
+    } catch (err) { 
+        console.error("Erro ao carregar dados", err) 
+    }
   }
 
   useEffect(() => {
@@ -63,28 +66,18 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
       .channel(`ticket-realtime-${id}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'Message', 
-          filter: `ticketId=eq.${id}`
-        },
+        { event: 'INSERT', schema: 'public', table: 'Message', filter: `ticketId=eq.${id}` },
         (payload) => {
           setMessages((prev) => {
             if (prev.find(m => m.id === payload.new.id)) return prev;
             return [...prev, payload.new];
           });
-          
-          if (isAutoScrollEnabled) {
-            setTimeout(() => scrollToBottom('smooth'), 100);
-          }
+          if (isAutoScrollEnabled) setTimeout(() => scrollToBottom('smooth'), 100);
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [id]); 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -97,78 +90,39 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     if (file.type === 'application/pdf') {
-      setFileToUpload(file)
-      setPreviewUrl('pdf-icon')
-      return
+      setFileToUpload(file); setPreviewUrl('pdf-icon'); return;
     }
-
     try {
-      // OTIMIZAÇÃO 1: Compressão agressiva e conversão para JPEG
-      const options = {
-        maxSizeMB: 0.2,           
-        maxWidthOrHeight: 1280,
-        useWebWorker: true,
-        fileType: 'image/jpeg' as const // Força JPEG para economizar banda
-      }
+      const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1280, useWebWorker: true, fileType: 'image/jpeg' as const }
       const compressedFile = await imageCompression(file, options);
       setFileToUpload(compressedFile)
       setPreviewUrl(URL.createObjectURL(compressedFile)) 
-    } catch (error) {
-      console.error("Erro ao comprimir imagem:", error)
-    }
+    } catch (error) { console.error("Erro ao comprimir imagem:", error) }
   }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!newMessage.trim() && !fileToUpload) return
-    
     try {
       let finalUrl = null;
-
       if (fileToUpload) {
-        // Garante a extensão correta se foi convertido para jpeg
         const fileExt = fileToUpload.type === 'image/jpeg' ? 'jpg' : fileToUpload.name.split('.').pop();
         const fileName = `${id}-${Date.now()}.${fileExt}`;
-        
-        // OTIMIZAÇÃO 2: Cache-Control para o navegador não baixar a mesma imagem várias vezes
-        const { data, error } = await supabase.storage
-          .from('anexos')
-          .upload(fileName, fileToUpload, {
-            cacheControl: '3600', // Cache de 1 hora
-            upsert: false
-          });
-
+        const { error } = await supabase.storage.from('anexos').upload(fileName, fileToUpload, { cacheControl: '31536000', upsert: false });
         if (error) throw error;
-
-        const { data: publicData } = supabase.storage
-          .from('anexos')
-          .getPublicUrl(fileName);
-        
+        const { data: publicData } = supabase.storage.from('anexos').getPublicUrl(fileName);
         finalUrl = publicData.publicUrl;
       }
-
-      await axios.post(`${API_URL}/messages`, {
-        texto: newMessage, 
-        imagem: finalUrl, 
-        ticketId: Number(id), 
-        autorId: Number(userId) 
-      })
-
-      setNewMessage(''); 
-      setFileToUpload(null);
-      setPreviewUrl(null);
-    } catch (err) { 
-      console.error(err)
-      alert("Erro ao enviar mensagem") 
-    }
+      await axios.post(`${API_URL}/messages`, { texto: newMessage, imagem: finalUrl, ticketId: Number(id), autorId: Number(userId) })
+      setNewMessage(''); setFileToUpload(null); setPreviewUrl(null);
+    } catch (err) { alert("Erro ao enviar mensagem") }
   }
 
   const handleAvaliar = async (estrelas: number) => {
     try {
       await axios.patch(`${API_URL}/tickets/${id}`, { avaliacao: Number(estrelas), status: 'FECHADO' })
-      setTicket((prev: any) => ({ ...prev, avaliacao: estrelas }))
+      setTicket((prev: any) => ({ ...prev, avaliacao: estrelas, status: 'FECHADO' }))
     } catch (err) { alert("Erro ao salvar avaliação") }
   }
 
@@ -214,7 +168,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
 
         {messages.map((msg) => {
           const isMe = Number(msg.autorId) === Number(userId);
-          const isPDF = msg.imagem?.toLowerCase().endsWith(".pdf") || msg.imagem?.includes("application/pdf");
+          const isPDF = msg.imagem?.toLowerCase().endsWith(".pdf");
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] p-4 rounded-2xl shadow-2xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
@@ -224,17 +178,10 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
                     {isPDF ? (
                       <div className="p-4 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2 text-red-400"><FileText size={20} /><span className="text-[10px] font-bold uppercase">PDF</span></div>
-                        <a href={msg.imagem} target="_blank" rel="noreferrer" className="p-2 bg-slate-700 hover:bg-blue-500 rounded-lg transition-colors"><Download size={16} /></a>
+                        <a href={msg.imagem} target="_blank" rel="noreferrer" className="p-2 bg-slate-700 hover:bg-blue-500 rounded-lg"><Download size={16} /></a>
                       </div>
                     ) : (
-                      /* OTIMIZAÇÃO 3: Lazy Loading e Altura Máxima */
-                      <img 
-                        src={msg.imagem} 
-                        alt="Anexo" 
-                        className="w-full max-h-96 object-contain cursor-pointer transition-opacity hover:opacity-90" 
-                        loading="lazy" 
-                        onClick={() => window.open(msg.imagem)} 
-                      />
+                      <img src={msg.imagem} alt="Anexo" className="w-full max-h-96 object-contain cursor-pointer" loading="lazy" onClick={() => window.open(msg.imagem)} />
                     )}
                   </div>
                 )}
@@ -261,7 +208,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
             <form onSubmit={handleSendMessage} className="flex gap-3 items-end">
               <label className="p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl cursor-pointer text-slate-400 border border-slate-700 transition-colors"><Plus size={24} /><input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleFileChange} /></label>
               <textarea rows={1} className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm resize-none outline-none focus:ring-2 focus:ring-blue-500 text-white" placeholder="Digite sua resposta..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={handleKeyDown} />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 p-4 rounded-2xl text-white transition-all shadow-lg active:scale-95 disabled:opacity-50" disabled={!newMessage.trim() && !fileToUpload}><Send size={24} /></button>
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 p-4 rounded-2xl text-white shadow-lg disabled:opacity-50" disabled={!newMessage.trim() && !fileToUpload}><Send size={24} /></button>
             </form>
           </div>
         ) : (
@@ -283,7 +230,7 @@ export default function TicketDetails({ params }: { params: Promise<{ id: string
                     <div className="flex gap-1 mb-2">
                       {[1, 2, 3, 4, 5].map((i) => (<Star key={i} size={20} className={i <= ticket.avaliacao ? "fill-yellow-500 text-yellow-500" : "text-slate-800"} />))}
                     </div>
-                    <p className="text-emerald-500 font-black text-[10px] uppercase tracking-widest italic tracking-widest">Atendimento nota {ticket.avaliacao}!</p>
+                    <p className="text-emerald-500 font-black text-[10px] uppercase italic tracking-widest">Atendimento nota {ticket.avaliacao}!</p>
                   </div>
                 ) : (
                   <p className="text-slate-600 font-black text-[10px] uppercase tracking-widest">Aguardando avaliação do cliente...</p>
