@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common'; // Adicionamos Patch e Param aqui
+import { Controller, Post, Body, Get, Patch, Param, Query, Delete } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 
 @Controller('tickets')
@@ -11,14 +11,23 @@ export class TicketsController {
   }
 
   @Get()
-  findAll() {
-    return this.ticketsService.findAll();
+  findAll(@Query('userId') userId?: string) {
+    // Crucial: Converte a query string para número antes de mandar pro Service
+    return this.ticketsService.findAll(userId ? Number(userId) : undefined);
   }
 
-  // Rota para atualizar o status (ex: fechar o chamado)
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.ticketsService.findOne(Number(id));
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateData: any) {
-    // O sinal de + antes do id serve para converter a string em número
-    return this.ticketsService.update(+id, updateData);
-  } 
+    return this.ticketsService.update(Number(id), updateData);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.ticketsService.remove(Number(id));
+  }
 }

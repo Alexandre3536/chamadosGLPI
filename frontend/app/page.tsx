@@ -19,11 +19,9 @@ export default function Home() {
   const [descricao, setDescricao] = useState('')
   const [prioridade, setPrioridade] = useState('BAIXA')
 
-  // Pega os dados do usuário com segurança
   const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : 'USER'
 
-  // BUSCA OTIMIZADA: Manda o userId para o backend filtrar lá
   const fetchTickets = () => {
     if (!userId) return;
     const url = userRole === 'ADMIN' ? `${API_URL}/tickets` : `${API_URL}/tickets?userId=${userId}`;
@@ -48,8 +46,6 @@ export default function Home() {
       setUserName(name)
       fetchTickets()
       fetchUserData(userId)
-      // REMOVEMOS O INTERVALO DE 5 SEGUNDOS. 
-      // O sistema agora carrega ao entrar ou ao criar um ticket.
     }
   }, [])
 
@@ -81,13 +77,12 @@ export default function Home() {
       setTitulo(''); 
       setDescricao(''); 
       setIsModalOpen(false); 
-      fetchTickets() // Recarrega a lista após criar
+      fetchTickets()
     } catch (err) { 
       alert("Erro ao criar chamado.") 
     }
   }
 
-  // Filtros rápidos no frontend
   const ticketsFiltrados = tickets.filter((t: any) => {
     if (filtroAtivo === 'ABERTOS') return t.status !== 'FECHADO'
     if (filtroAtivo === 'CRITICOS') return t.prioridade === 'ALTA' && t.status !== 'FECHADO'
@@ -113,7 +108,6 @@ export default function Home() {
                 </button>
               </Link>
             )}
-
              <div className="flex items-center gap-4 bg-slate-900/50 p-2 pr-4 rounded-2xl border border-slate-800">
               <label className="relative group cursor-pointer w-12 h-12 rounded-xl overflow-hidden bg-slate-800">
                 {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="avatar" /> : <div className="w-full h-full flex items-center justify-center bg-blue-500/10 text-blue-500 font-black">{userName.charAt(0)}</div>}
@@ -125,7 +119,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* INDICADORES */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
           <div onClick={() => setFiltroAtivo('TODOS')} className={`cursor-pointer p-4 rounded-2xl border ${filtroAtivo === 'TODOS' ? 'bg-slate-800 border-blue-500' : 'bg-slate-900/50 border-slate-800'}`}>
             <div className="flex items-center gap-4">
@@ -153,7 +146,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* LISTAGEM */}
         <div className="grid gap-4">
           {ticketsFiltrados.map((ticket: any) => {
             const mensagens = ticket.messages || [];
@@ -168,7 +160,6 @@ export default function Home() {
                       NOVA RESPOSTA
                     </div>
                   )}
-
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h2 className="text-xl font-bold uppercase tracking-tight text-white">{ticket.titulo}</h2>
@@ -178,9 +169,7 @@ export default function Home() {
                     </div>
                     <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-black/20 border border-white/5">{ticket.status}</span>
                   </div>
-                  
                   <p className="text-slate-400 text-sm mb-4 line-clamp-1 italic">"{ticket.descricao}"</p>
-                  
                   <div className="text-[10px] text-slate-500 flex items-center justify-between border-t border-white/5 pt-4 font-bold uppercase">
                     <span>Prioridade: <span className={ticket.prioridade === 'ALTA' ? 'text-red-500' : 'text-slate-300'}>{ticket.prioridade}</span></span>
                     <span className="text-blue-500 font-black">ABRIR CHAT →</span>
@@ -192,7 +181,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-[2.5rem] p-10 relative">

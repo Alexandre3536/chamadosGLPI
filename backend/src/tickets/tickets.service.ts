@@ -16,11 +16,11 @@ export class TicketsService {
     });
   }
 
-  async findAll() {
+  async findAll(userId?: number) {
     return this.prisma.ticket.findMany({
+      where: userId ? { clienteId: userId } : {}, // Se enviar ID, filtra. Se não, traz tudo (Admin).
       include: { 
         cliente: true,
-        messages: true 
       },
       orderBy: {
         updatedAt: 'desc'
@@ -28,24 +28,25 @@ export class TicketsService {
     });
   }
 
-  // FUNÇÃO CORRIGIDA: Vamos filtrar o que entra no banco
-  async update(id: number, updateData: any) {
-    // Destruturamos o objeto para REMOVER a avaliacao, se ela vier no pacote
-    const { avaliacao, ...dadosFiltrados } = updateData;
-
-    return this.prisma.ticket.update({
-      where: { id },
-      data: dadosFiltrados, // Enviamos apenas o que o banco conhece (titulo, descricao, status, etc)
-    });
-  }
-
   async findOne(id: number) {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
-      include: { cliente: true, messages: true }
+      include: { 
+        cliente: true, 
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
     });
     if (!ticket) throw new NotFoundException(`Ticket #${id} não encontrado`);
     return ticket;
+  }
+
+  async update(id: number, updateData: any) {
+    return this.prisma.ticket.update({
+      where: { id },
+      data: updateData,
+    });
   }
 
   async remove(id: number) {
