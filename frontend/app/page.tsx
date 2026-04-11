@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, MessageSquare, Users, User } from 'lucide-react'
+import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, Users, User } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -149,14 +149,15 @@ export default function Home() {
         <div className="grid gap-4">
           {ticketsFiltrados.map((ticket: any) => {
             const mensagens = ticket.messages || [];
-            const ultimaMsg = mensagens.length > 0 ? mensagens[mensagens.length - 1] : null;
+            // Se o backend trouxer mensagens ordenadas por data desc, a primeira é a última enviada
+            const ultimaMsg = mensagens.length > 0 ? mensagens[0] : null;
             const temNovidade = ultimaMsg && String(ultimaMsg.autorId) !== String(userId) && ticket.status !== 'FECHADO';
 
             return (
               <Link href={`/tickets/${ticket.id}`} key={ticket.id} className="block group">
                 <div className={`bg-slate-900 border-l-4 p-6 rounded-2xl hover:brightness-110 transition-all cursor-pointer relative ${ticket.status === 'REABERTO' ? 'border-l-orange-500' : ticket.prioridade === 'ALTA' ? 'border-l-red-600' : 'border-l-blue-500'} border-y border-r border-slate-800`}>
                   {temNovidade && (
-                    <div className="absolute top-4 right-4 bg-blue-600 text-[8px] font-black px-3 py-1.5 rounded-full animate-bounce shadow-lg">
+                    <div className="absolute top-4 right-4 bg-blue-600 text-[8px] font-black px-3 py-1.5 rounded-full animate-bounce shadow-[0_0_15px_rgba(37,99,235,0.5)] z-10">
                       NOVA RESPOSTA
                     </div>
                   )}
