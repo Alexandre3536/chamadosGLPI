@@ -18,9 +18,14 @@ export class TicketsService {
 
   async findAll(userId?: number) {
     return this.prisma.ticket.findMany({
-      where: userId ? { clienteId: userId } : {}, // Se enviar ID, filtra. Se não, traz tudo (Admin).
+      where: userId ? { clienteId: userId } : {}, 
       include: { 
         cliente: true,
+        // O PULO DO GATO: Traz apenas a última mensagem para o selo azul funcionar na Home
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1, 
+        }
       },
       orderBy: {
         updatedAt: 'desc'
@@ -34,7 +39,7 @@ export class TicketsService {
       include: { 
         cliente: true, 
         messages: {
-          orderBy: { createdAt: 'asc' }
+          orderBy: { createdAt: 'asc' } // Aqui no detalhe traz todas em ordem cronológica
         }
       }
     });
@@ -43,9 +48,11 @@ export class TicketsService {
   }
 
   async update(id: number, updateData: any) {
+    // Destruturação para garantir que o ID não seja enviado no corpo do update do Prisma
+    const { id: _, ...data } = updateData;
     return this.prisma.ticket.update({
       where: { id },
-      data: updateData,
+      data: data,
     });
   }
 

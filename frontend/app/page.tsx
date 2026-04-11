@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, MessageSquare, Users, User } from 'lucide-react'
+import { Plus, X, Ticket, AlertCircle, Clock, CheckCircle2, RotateCcw, Users, User } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -19,11 +19,9 @@ export default function Home() {
   const [descricao, setDescricao] = useState('')
   const [prioridade, setPrioridade] = useState('BAIXA')
 
-  // Pega os dados do usuário com segurança
   const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : 'USER'
 
-  // BUSCA OTIMIZADA: Manda o userId para o backend filtrar lá
   const fetchTickets = () => {
     if (!userId) return;
     const url = userRole === 'ADMIN' ? `${API_URL}/tickets` : `${API_URL}/tickets?userId=${userId}`;
@@ -48,8 +46,6 @@ export default function Home() {
       setUserName(name)
       fetchTickets()
       fetchUserData(userId)
-      // REMOVEMOS O INTERVALO DE 5 SEGUNDOS. 
-      // O sistema agora carrega ao entrar ou ao criar um ticket.
     }
   }, [])
 
@@ -81,13 +77,12 @@ export default function Home() {
       setTitulo(''); 
       setDescricao(''); 
       setIsModalOpen(false); 
-      fetchTickets() // Recarrega a lista após criar
+      fetchTickets()
     } catch (err) { 
       alert("Erro ao criar chamado.") 
     }
   }
 
-  // Filtros rápidos no frontend
   const ticketsFiltrados = tickets.filter((t: any) => {
     if (filtroAtivo === 'ABERTOS') return t.status !== 'FECHADO'
     if (filtroAtivo === 'CRITICOS') return t.prioridade === 'ALTA' && t.status !== 'FECHADO'
@@ -113,7 +108,6 @@ export default function Home() {
                 </button>
               </Link>
             )}
-
              <div className="flex items-center gap-4 bg-slate-900/50 p-2 pr-4 rounded-2xl border border-slate-800">
               <label className="relative group cursor-pointer w-12 h-12 rounded-xl overflow-hidden bg-slate-800">
                 {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="avatar" /> : <div className="w-full h-full flex items-center justify-center bg-blue-500/10 text-blue-500 font-black">{userName.charAt(0)}</div>}
@@ -125,7 +119,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* INDICADORES */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
           <div onClick={() => setFiltroAtivo('TODOS')} className={`cursor-pointer p-4 rounded-2xl border ${filtroAtivo === 'TODOS' ? 'bg-slate-800 border-blue-500' : 'bg-slate-900/50 border-slate-800'}`}>
             <div className="flex items-center gap-4">
@@ -153,18 +146,20 @@ export default function Home() {
           </div>
         </div>
 
-        {/* LISTAGEM */}
         <div className="grid gap-4">
           {ticketsFiltrados.map((ticket: any) => {
+            // LÓGICA DO SELO AZUL: 
+            // O backend traz a última mensagem no índice 0
             const mensagens = ticket.messages || [];
-            const ultimaMsg = mensagens.length > 0 ? mensagens[mensagens.length - 1] : null;
+            const ultimaMsg = mensagens[0]; 
             const temNovidade = ultimaMsg && String(ultimaMsg.autorId) !== String(userId) && ticket.status !== 'FECHADO';
 
             return (
               <Link href={`/tickets/${ticket.id}`} key={ticket.id} className="block group">
                 <div className={`bg-slate-900 border-l-4 p-6 rounded-2xl hover:brightness-110 transition-all cursor-pointer relative ${ticket.status === 'REABERTO' ? 'border-l-orange-500' : ticket.prioridade === 'ALTA' ? 'border-l-red-600' : 'border-l-blue-500'} border-y border-r border-slate-800`}>
+                  
                   {temNovidade && (
-                    <div className="absolute top-4 right-4 bg-blue-600 text-[8px] font-black px-3 py-1.5 rounded-full animate-bounce shadow-lg">
+                    <div className="absolute top-4 right-4 bg-blue-600 text-[8px] font-black px-3 py-1.5 rounded-full animate-bounce shadow-[0_0_15px_rgba(37,99,235,0.5)] z-10 border border-blue-400">
                       NOVA RESPOSTA
                     </div>
                   )}
@@ -178,9 +173,7 @@ export default function Home() {
                     </div>
                     <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase bg-black/20 border border-white/5">{ticket.status}</span>
                   </div>
-                  
                   <p className="text-slate-400 text-sm mb-4 line-clamp-1 italic">"{ticket.descricao}"</p>
-                  
                   <div className="text-[10px] text-slate-500 flex items-center justify-between border-t border-white/5 pt-4 font-bold uppercase">
                     <span>Prioridade: <span className={ticket.prioridade === 'ALTA' ? 'text-red-500' : 'text-slate-300'}>{ticket.prioridade}</span></span>
                     <span className="text-blue-500 font-black">ABRIR CHAT →</span>
@@ -192,7 +185,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-[2.5rem] p-10 relative">
